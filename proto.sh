@@ -1,13 +1,15 @@
 #!/bin/bash
 set -e
 
+# need to be absolute paths for rsync
 SRC="test/src"
 DEST="test/dest"
+# set to script directory for testing
+DEST="$(pwd)/test/dest"
 
 SRC="/Volumes/Untitled"
 
 # TEMP reset test
-# rm -rf "$SRC"/*
 # rm -rf "$DEST"/*
 
 mkdir -p "$DEST"
@@ -24,7 +26,7 @@ if [ -z "$(ls -A "$SRC/DCIM/"*/)" ]; then
 fi
 
 # check that the files are the expected types
-if ! find "$SRC/DCIM/"* -type f \
+first_media_file=$(find "$SRC/DCIM/"* -type f \
     \( -iname "*.jpg" -o \
        -iname "*.jpeg" -o \
        -iname "*.mp4" -o \
@@ -33,7 +35,8 @@ if ! find "$SRC/DCIM/"* -type f \
        -iname "*.heif" -o \
        -iname "*.png" -o \
        -iname "*.arw" \
-    \) | grep -q .; then
+    \) | head -n 1)
+if [ -z "$first_media_file" ]; then
     echo "No valid media files found in source: $SRC"
     exit 1
 fi
@@ -42,13 +45,13 @@ fi
 # 1. Determine camera type
 DCIM="$SRC/DCIM"
 camera_type="Unknown"
-if exiftool "$DCIM"/* | grep -q "DJI OsmoPocket3"; then
+if exiftool "$first_media_file" | grep -q "DJI OsmoPocket3"; then
     echo "Camera: DJI Osmo Pocket 3"
     camera_type="DJI Osmo Pocket 3"
-elif exiftool "$DCIM"/* | grep -q "ILCE-7C"; then
+elif exiftool "$first_media_file" | grep -q "ILCE-7C"; then
     echo "Camera: Sony A7C"
     camera_type="Sony A7C"
-elif exiftool "$DCIM"/* | grep -q "FinePix XP150"; then
+elif exiftool "$first_media_file" | grep -q "FinePix XP150"; then
     echo "Camera: FinePix XP150"
     camera_type="Fujifilm FP XP150"
 else
@@ -56,13 +59,6 @@ else
     echo "No supported camera type detected in source: $SRC"
     exit 1
 fi
-# elif exiftool "$SRC"/* | grep -q "Canon"; then
-#     echo "Camera: Canon"
-# elif exiftool "$SRC"/* | grep -q "Nikon"; then
-#     echo "Camera: Nikon"
-# else
-#     echo "Camera: Unknown"
-# fi
 
 echo "Camera type detected: $camera_type"
 
@@ -76,26 +72,41 @@ if [ -d "$DEST" ]; then
 fi
 mkdir -p "$DEST"
 
-exit 0
-
 # 2. Copy files using rsync
-echo "Copying files..."
-rsync -av --progress "$SRC"/ "$DEST"/
+echo "Copying files from $SRC to $DEST..."
+rsync -ahv --progress --checksum \
+    --exclude='.*' \
+    --include='DCIM/**' \
+    --include='PRIVATE/M4ROOT/CLIP/**' \
+    --include='*/' \
+    --include='*.jpg' --include='*.jpeg' --include='*.mp4' --include='*.mov' \
+    --include='*.heic' --include='*.heif' --include='*.png' --include='*.arw' \
+    --exclude='*' \
+    "$SRC/" "$DEST/"
 
 # 3. Checksum verification
 echo "Running checksums..."
 cd "$SRC"
-find . -type f -exec sha256sum "{}" \; | sort > /tmp/source_checksum.txt
+find "DCIM" "PRIVATE/M4ROOT/CLIP" -type f \
+  \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.mp4" -o -iname "*.mov" \
+     -o -iname "*.heic" -o -iname "*.heif" -o -iname "*.png" -o -iname "*.arw" \) \
+  ! -name '.*' ! -name '._*' \
+  -exec sha256sum "{}" \; | sort > /tmp/source_checksum.txt
 
 cd "$DEST"
-find . -type f -exec sha256sum "{}" \; | sort > /tmp/dest_checksum.txt
+find "DCIM" "PRIVATE/M4ROOT/CLIP" -type f \
+  \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.mp4" -o -iname "*.mov" \
+     -o -iname "*.heic" -o -iname "*.heif" -o -iname "*.png" -o -iname "*.arw" \) \
+  ! -name '.*' ! -name '._*' \
+  -exec sha256sum "{}" \; | sort > /tmp/dest_checksum.txt
 
 if diff /tmp/source_checksum.txt /tmp/dest_checksum.txt; then
     echo "Checksums match. Deleting source files."
-    rm -rf "$SRC"/*
+    # rm -rf "$SRC"/*
 else
     echo "Checksum mismatch. Aborting deletion."
     exit 1
 fi
 
 echo "Transfer complete."
+exit 0
