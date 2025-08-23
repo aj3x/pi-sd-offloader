@@ -1,0 +1,14 @@
+# Pi SD Offloader udev rules for automatic SD card detection
+# Place this file in /etc/udev/rules.d/
+
+# Built-in SD card readers (e.g., Raspberry Pi SD slot)
+# Triggers on MMC/SD cards detected by the kernel
+ACTION=="add", KERNEL=="mmcblk[0-9]*", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", TAG+="systemd", ENV{SYSTEMD_WANTS}="pi-sd-offloader@%k.service"
+
+# USB SD card readers and USB mass storage devices
+# Triggers on USB storage devices that are removable
+ACTION=="add", KERNEL=="sd[a-z]*", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ATTRS{removable}=="1", TAG+="systemd", ENV{SYSTEMD_WANTS}="pi-sd-offloader@%k.service"
+
+# Additional rule for USB devices with "Card" or "Reader" in the model name
+ACTION=="add", KERNEL=="sd[a-z]*", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", SUBSYSTEMS=="usb", ATTRS{product}=="*Card*", TAG+="systemd", ENV{SYSTEMD_WANTS}="pi-sd-offloader@%k.service"
+ACTION=="add", KERNEL=="sd[a-z]*", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", SUBSYSTEMS=="usb", ATTRS{product}=="*Reader*", TAG+="systemd", ENV{SYSTEMD_WANTS}="pi-sd-offloader@%k.service"

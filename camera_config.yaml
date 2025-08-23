@@ -142,13 +142,13 @@ settings:
     transfer_mode: "auto"  # auto, direct_nas, local_first
     nas_timeout_seconds: 10
     local_storage_path: "/home/pi/photos_temp"
-    nas_storage_path: "/mnt/nas/Photos"
+    nas_storage_path: "/mnt/sasquatch/aj3x/Photos"
     verify_checksums: true
     delete_after_transfer: true
     preserve_timestamps: true
     buffer_size: "64KB"
     
   network_settings:
-    nas_test_command: "ping -c 1 -W 5 synology.local"
+    nas_test_command: "ping -c 1 -W 5 syn.lan"
     vpn_check_command: "ip route | grep -q tun0"
     fallback_to_local: true
