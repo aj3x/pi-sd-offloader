@@ -1,0 +1,7 @@
+Flask==2.3.3
+Flask-SocketIO==5.3.6
+python-socketio==5.8.0
+eventlet==0.33.3
+PyYAML==6.0.1
+python-magic==0.4.27
+watchdog==3.0.0

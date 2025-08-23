@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi SD Offloader</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #28a745;
+        }
+        .status-idle { border-left-color: #6c757d; }
+        .status-detecting { border-left-color: #007bff; }
+        .status-confirming { border-left-color: #ffc107; }
+        .status-transferring { border-left-color: #17a2b8; }
+        .status-complete { border-left-color: #28a745; }
+        .status-error { border-left-color: #dc3545; }
+        
+        .device-info {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s ease;
+        }
+        .confirmation-panel {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .conflict-list {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .hidden {
+            display: none;
+        }
+        .nav-link {
+            display: inline-block;
+            padding: 10px 20px;
+            text-decoration: none;
+            color: #007bff;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .nav-link:hover {
+            background: #e9ecef;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Pi SD Offloader</h1>
+            <p>Automatic photo and video transfer from SD cards</p>
+            <nav>
+                <a href="/" class="nav-link">Dashboard</a>
+                <a href="/settings" class="nav-link">Settings</a>
+            </nav>
+        </div>
+
+        <!-- Status Card -->
+        <div id="status-card" class="status-card status-idle">
+            <h3 id="status-title">System Idle</h3>
+            <p id="status-description">Waiting for SD card insertion...</p>
+        </div>
+
+        <!-- Device Information -->
+        <div id="device-info" class="device-info hidden">
+            <h4>📷 Detected Device</h4>
+            <div id="device-details"></div>
+        </div>
+
+        <!-- Transfer Progress -->
+        <div id="transfer-section" class="hidden">
+            <h4>📁 Transfer Progress</h4>
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div id="files-completed" class="stat-value">0</div>
+                    <div class="stat-label">Files Completed</div>
+                </div>
+                <div class="stat-item">
+                    <div id="files-total" class="stat-value">0</div>
+                    <div class="stat-label">Total Files</div>
+                </div>
+                <div class="stat-item">
+                    <div id="transfer-speed" class="stat-value">0 MB/s</div>
+                    <div class="stat-label">Transfer Speed</div>
+                </div>
+                <div class="stat-item">
+                    <div id="time-remaining" class="stat-value">--:--</div>
+                    <div class="stat-label">Time Remaining</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirmation Panel -->
+        <div id="confirmation-panel" class="confirmation-panel hidden">
+            <h4>⚠️ Confirmation Required</h4>
+            <p id="confirmation-message">Ready to transfer files from the detected device.</p>
+            
+            <div id="conflicts-section" class="hidden">
+                <h5>File Conflicts:</h5>
+                <div id="conflicts-list" class="conflict-list"></div>
+                <label>
+                    <input type="checkbox" id="handle-overwrites"> 
+                    Overwrite existing files
+                </label>
+            </div>
+            
+            <div class="button-group">
+                <button id="btn-proceed" class="btn-primary">✅ Proceed</button>
+                <button id="btn-cancel" class="btn-danger">❌ Cancel</button>
+            </div>
+            
+            <div id="timeout-warning" style="margin-top: 15px; color: #856404;">
+                ⏰ Auto-cancel in <span id="timeout-counter">5:00</span> if no action taken.
+            </div>
+        </div>
+
+        <!-- Network Status -->
+        <div id="network-status" class="device-info">
+            <h4>🌐 Network Status</h4>
+            <div id="network-details">
+                <p>📡 NAS Connection: <span id="nas-status">Testing...</span></p>
+                <p>🔒 VPN Status: <span id="vpn-status">Testing...</span></p>
+                <p>🔄 Last Updated: <span id="network-timestamp">Never</span></p>
+            </div>
+            <button id="test-network-btn" class="btn-primary">Test Network</button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // DOM elements
+        const statusCard = document.getElementById('status-card');
+        const statusTitle = document.getElementById('status-title');
+        const statusDescription = document.getElementById('status-description');
+        const deviceInfo = document.getElementById('device-info');
+        const deviceDetails = document.getElementById('device-details');
+        const transferSection = document.getElementById('transfer-section');
+        const confirmationPanel = document.getElementById('confirmation-panel');
+        const confirmationMessage = document.getElementById('confirmation-message');
+        const conflictsSection = document.getElementById('conflicts-section');
+        const conflictsList = document.getElementById('conflicts-list');
+        const handleOverwrites = document.getElementById('handle-overwrites');
+        const timeoutCounter = document.getElementById('timeout-counter');
+
+        // State management
+        let countdownInterval;
+
+        // Socket event handlers
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+
+        socket.on('status_update', function(state) {
+            updateStatus(state.status, state);
+        });
+
+        socket.on('device_detected', function(deviceInfo) {
+            showDeviceInfo(deviceInfo);
+        });
+
+        socket.on('transfer_progress', function(progress) {
+            updateTransferProgress(progress);
+        });
+
+        socket.on('confirmation_required', function(data) {
+            showConfirmation(data);
+        });
+
+        socket.on('confirmation_received', function(data) {
+            hideConfirmation();
+        });
+
+        // Status updates
+        function updateStatus(status, state = {}) {
+            statusCard.className = `status-card status-${status}`;
+            
+            const statusMessages = {
+                'idle': {
+                    title: 'System Idle',
+                    description: 'Waiting for SD card insertion...'
+                },
+                'detecting': {
+                    title: 'Detecting Device',
+                    description: 'Analyzing SD card contents and identifying camera...'
+                },
+                'confirming': {
+                    title: 'Awaiting Confirmation',
+                    description: 'Please review and confirm the transfer details.'
+                },
+                'transferring': {
+                    title: 'Transfer in Progress',
+                    description: 'Copying files and verifying checksums...'
+                },
+                'complete': {
+                    title: 'Transfer Complete',
+                    description: 'All files transferred successfully!'
+                },
+                'error': {
+                    title: 'Error Occurred',
+                    description: state.error_message || 'An unknown error occurred.'
+                }
+            };
+
+            const msg = statusMessages[status] || statusMessages['idle'];
+            statusTitle.textContent = msg.title;
+            statusDescription.textContent = msg.description;
+
+            // Show/hide sections based on status
+            deviceInfo.classList.toggle('hidden', !['confirming', 'transferring', 'complete'].includes(status));
+            transferSection.classList.toggle('hidden', status !== 'transferring');
+            confirmationPanel.classList.toggle('hidden', status !== 'confirming');
+        }
+
+        function showDeviceInfo(info) {
+            deviceDetails.innerHTML = `
+                <p><strong>Camera:</strong> ${info.camera_name || 'Unknown'}</p>
+                <p><strong>Detection Method:</strong> ${info.detection_methods?.join(', ') || 'Unknown'}</p>
+                <p><strong>Confidence:</strong> ${info.confidence_score || 0}%</p>
+                <p><strong>Files Found:</strong> ${Object.values(info.file_sources || {}).flat().length} files</p>
+            `;
+            deviceInfo.classList.remove('hidden');
+        }
+
+        function updateTransferProgress(progress) {
+            const progressFill = document.getElementById('progress-fill');
+            const filesCompleted = document.getElementById('files-completed');
+            const filesTotal = document.getElementById('files-total');
+            const transferSpeed = document.getElementById('transfer-speed');
+            const timeRemaining = document.getElementById('time-remaining');
+
+            const percentage = progress.total_files > 0 
+                ? Math.round((progress.completed_files / progress.total_files) * 100)
+                : 0;
+            
+            progressFill.style.width = `${percentage}%`;
+            filesCompleted.textContent = progress.completed_files || 0;
+            filesTotal.textContent = progress.total_files || 0;
+            
+            const speedMBps = (progress.transfer_rate || 0) / (1024 * 1024);
+            transferSpeed.textContent = `${speedMBps.toFixed(1)} MB/s`;
+            
+            const remainingTime = progress.transfer_rate > 0 
+                ? ((progress.total_size - progress.transferred_size) / progress.transfer_rate)
+                : 0;
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = Math.floor(remainingTime % 60);
+            timeRemaining.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function showConfirmation(data) {
+            const hasConflicts = data.conflicts && data.conflicts.length > 0;
+            
+            confirmationMessage.textContent = hasConflicts
+                ? `Ready to transfer files. Warning: ${data.conflicts.length} files will be overwritten.`
+                : 'Ready to transfer files from the detected device.';
+            
+            if (hasConflicts) {
+                conflictsList.innerHTML = data.conflicts.map(file => `<div>📄 ${file}</div>`).join('');
+                conflictsSection.classList.remove('hidden');
+            } else {
+                conflictsSection.classList.add('hidden');
+            }
+
+            startConfirmationTimeout();
+            confirmationPanel.classList.remove('hidden');
+        }
+
+        function hideConfirmation() {
+            confirmationPanel.classList.add('hidden');
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+        }
+
+        function startConfirmationTimeout() {
+            let timeLeft = 300; // 5 minutes
+            
+            countdownInterval = setInterval(() => {
+                timeLeft--;
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                timeoutCounter.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    // Auto-cancel
+                    fetch('/api/confirm_transfer', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'cancel' })
+                    });
+                }
+            }, 1000);
+        }
+
+        // Button event handlers
+        document.getElementById('btn-proceed').addEventListener('click', function() {
+            fetch('/api/confirm_transfer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'proceed',
+                    handle_overwrites: handleOverwrites.checked
+                })
+            });
+        });
+
+        document.getElementById('btn-cancel').addEventListener('click', function() {
+            fetch('/api/confirm_transfer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'cancel' })
+            });
+        });
+
+        document.getElementById('test-network-btn').addEventListener('click', function() {
+            testNetwork();
+        });
+
+        // Network testing
+        function testNetwork() {
+            document.getElementById('nas-status').textContent = 'Testing...';
+            document.getElementById('vpn-status').textContent = 'Testing...';
+            
+            fetch('/api/network_test')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('nas-status').textContent = data.nas_available ? '✅ Connected' : '❌ Not Available';
+                    document.getElementById('vpn-status').textContent = data.vpn_active ? '✅ Active' : '❌ Inactive';
+                    document.getElementById('network-timestamp').textContent = new Date(data.timestamp).toLocaleTimeString();
+                })
+                .catch(error => {
+                    document.getElementById('nas-status').textContent = '❌ Test Failed';
+                    document.getElementById('vpn-status').textContent = '❌ Test Failed';
+                });
+        }
+
+        // Initial network test
+        testNetwork();
+    </script>
+</body>
+</html>

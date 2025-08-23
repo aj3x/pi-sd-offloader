@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Pi SD Offloader</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .nav-link {
+            display: inline-block;
+            padding: 10px 20px;
+            text-decoration: none;
+            color: #007bff;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .nav-link:hover {
+            background: #e9ecef;
+        }
+        .form-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #495057;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checkbox-group input {
+            width: auto;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            margin-left: 10px;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .alert {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .alert-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .hidden {
+            display: none;
+        }
+        .help-text {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ Settings</h1>
+            <nav>
+                <a href="/" class="nav-link">Dashboard</a>
+                <a href="/settings" class="nav-link">Settings</a>
+            </nav>
+        </div>
+
+        <div id="alert" class="alert hidden"></div>
+
+        <form id="settings-form">
+            <!-- Transfer Settings -->
+            <div class="form-section">
+                <h3>📁 Transfer Settings</h3>
+                
+                <div class="form-group">
+                    <label for="transfer-mode">Transfer Mode</label>
+                    <select id="transfer-mode" name="transfer_mode">
+                        <option value="auto">Auto (NAS if available, local fallback)</option>
+                        <option value="direct_nas">Direct to NAS</option>
+                        <option value="local_first">Local storage first</option>
+                    </select>
+                    <div class="help-text">Choose how files are transferred from SD cards</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="local-storage-path">Local Storage Path</label>
+                    <input type="text" id="local-storage-path" name="local_storage_path" 
+                           placeholder="/home/pi/photos_temp">
+                    <div class="help-text">Temporary storage location on the Pi</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="nas-storage-path">NAS Storage Path</label>
+                    <input type="text" id="nas-storage-path" name="nas_storage_path" 
+                           placeholder="/mnt/nas/Photos">
+                    <div class="help-text">Final destination on the NAS</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="nas-timeout">NAS Timeout (seconds)</label>
+                    <input type="number" id="nas-timeout" name="nas_timeout_seconds" 
+                           min="1" max="60" placeholder="10">
+                    <div class="help-text">How long to wait for NAS connectivity test</div>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="verify-checksums" name="verify_checksums">
+                    <label for="verify-checksums">Verify file checksums after transfer</label>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="delete-after-transfer" name="delete_after_transfer">
+                    <label for="delete-after-transfer">Delete files from SD card after successful transfer</label>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="preserve-timestamps" name="preserve_timestamps">
+                    <label for="preserve-timestamps">Preserve original file timestamps</label>
+                </div>
+            </div>
+
+            <!-- Network Settings -->
+            <div class="form-section">
+                <h3>🌐 Network Settings</h3>
+                
+                <div class="form-group">
+                    <label for="nas-test-command">NAS Test Command</label>
+                    <input type="text" id="nas-test-command" name="nas_test_command" 
+                           placeholder="ping -c 1 -W 5 synology.local">
+                    <div class="help-text">Command to test NAS availability</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="vpn-check-command">VPN Check Command</label>
+                    <input type="text" id="vpn-check-command" name="vpn_check_command" 
+                           placeholder="ip route | grep -q tun0">
+                    <div class="help-text">Command to check VPN status</div>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="fallback-to-local" name="fallback_to_local">
+                    <label for="fallback-to-local">Fallback to local storage if NAS unavailable</label>
+                </div>
+            </div>
+
+            <!-- User Interface Settings -->
+            <div class="form-section">
+                <h3>👤 User Interface</h3>
+                
+                <div class="form-group">
+                    <label for="web-port">Web Interface Port</label>
+                    <input type="number" id="web-port" name="web_port" 
+                           min="1024" max="65535" placeholder="8080">
+                    <div class="help-text">Port for the web interface (requires restart)</div>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="require-confirmation" name="require_confirmation">
+                    <label for="require-confirmation">Require user confirmation before transfer</label>
+                </div>
+
+                <div class="form-group">
+                    <label for="timeout-seconds">Confirmation Timeout (seconds)</label>
+                    <input type="number" id="timeout-seconds" name="timeout_seconds" 
+                           min="60" max="1800" placeholder="300">
+                    <div class="help-text">Auto-proceed timeout if no user response</div>
+                </div>
+            </div>
+
+            <!-- File Organization -->
+            <div class="form-section">
+                <h3>📋 File Organization</h3>
+                
+                <div class="form-group">
+                    <label for="date-format">Date Format</label>
+                    <select id="date-format" name="date_format">
+                        <option value="%Y%m%d">YYYYMMDD (20240315)</option>
+                        <option value="%Y-%m-%d">YYYY-MM-DD (2024-03-15)</option>
+                        <option value="%Y/%m/%d">YYYY/MM/DD (2024/03/15)</option>
+                    </select>
+                    <div class="help-text">Format for date-based folder names</div>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="preserve-folder-structure" name="preserve_folder_structure">
+                    <label for="preserve-folder-structure">Preserve original folder structure</label>
+                </div>
+
+                <div class="form-group">
+                    <label for="duplicate-check-scope">Duplicate Check Scope</label>
+                    <select id="duplicate-check-scope" name="check_scope">
+                        <option value="device_and_date">Per device per day</option>
+                        <option value="all_devices">All devices same day</option>
+                        <option value="global">Global (all devices, all dates)</option>
+                    </select>
+                    <div class="help-text">How thoroughly to check for duplicate files</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn-primary">💾 Save Settings</button>
+                <button type="button" id="reset-btn" class="btn-secondary">🔄 Reset to Defaults</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Form elements
+        const form = document.getElementById('settings-form');
+        const alert = document.getElementById('alert');
+
+        // Load current settings
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+                
+                // Populate form fields
+                populateFormFields(settings);
+            } catch (error) {
+                showAlert('Error loading settings: ' + error.message, 'error');
+            }
+        }
+
+        function populateFormFields(settings) {
+            const transferSettings = settings.transfer_settings || {};
+            const networkSettings = settings.network_settings || {};
+            const userInterface = settings.user_interaction || {};
+            const duplicateHandling = settings.duplicate_handling || {};
+
+            // Transfer settings
+            setValue('transfer-mode', transferSettings.transfer_mode);
+            setValue('local-storage-path', transferSettings.local_storage_path);
+            setValue('nas-storage-path', transferSettings.nas_storage_path);
+            setValue('nas-timeout', transferSettings.nas_timeout_seconds);
+            setCheckbox('verify-checksums', transferSettings.verify_checksums);
+            setCheckbox('delete-after-transfer', transferSettings.delete_after_transfer);
+            setCheckbox('preserve-timestamps', transferSettings.preserve_timestamps);
+
+            // Network settings
+            setValue('nas-test-command', networkSettings.nas_test_command);
+            setValue('vpn-check-command', networkSettings.vpn_check_command);
+            setCheckbox('fallback-to-local', networkSettings.fallback_to_local);
+
+            // User interface
+            setValue('web-port', userInterface.web_port);
+            setCheckbox('require-confirmation', userInterface.require_confirmation);
+            setValue('timeout-seconds', userInterface.timeout_seconds);
+
+            // File organization
+            setValue('date-format', settings.date_format);
+            setCheckbox('preserve-folder-structure', settings.preserve_folder_structure);
+            setValue('duplicate-check-scope', duplicateHandling.check_scope);
+        }
+
+        function setValue(id, value) {
+            const element = document.getElementById(id);
+            if (element && value !== undefined) {
+                element.value = value;
+            }
+        }
+
+        function setCheckbox(id, value) {
+            const element = document.getElementById(id);
+            if (element && value !== undefined) {
+                element.checked = !!value;
+            }
+        }
+
+        // Save settings
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            try {
+                const formData = new FormData(form);
+                const settings = {
+                    date_format: formData.get('date_format'),
+                    file_organization: 'import_date',
+                    preserve_folder_structure: formData.has('preserve_folder_structure'),
+                    
+                    duplicate_handling: {
+                        check_scope: formData.get('check_scope'),
+                        comparison_method: 'checksum'
+                    },
+                    
+                    user_interaction: {
+                        interface_type: 'web',
+                        web_port: parseInt(formData.get('web_port')) || 8080,
+                        require_confirmation: formData.has('require_confirmation'),
+                        timeout_seconds: parseInt(formData.get('timeout_seconds')) || 300
+                    },
+                    
+                    transfer_settings: {
+                        transfer_mode: formData.get('transfer_mode'),
+                        nas_timeout_seconds: parseInt(formData.get('nas_timeout_seconds')) || 10,
+                        local_storage_path: formData.get('local_storage_path'),
+                        nas_storage_path: formData.get('nas_storage_path'),
+                        verify_checksums: formData.has('verify_checksums'),
+                        delete_after_transfer: formData.has('delete_after_transfer'),
+                        preserve_timestamps: formData.has('preserve_timestamps'),
+                        buffer_size: '64KB'
+                    },
+                    
+                    network_settings: {
+                        nas_test_command: formData.get('nas_test_command'),
+                        vpn_check_command: formData.get('vpn_check_command'),
+                        fallback_to_local: formData.has('fallback_to_local')
+                    }
+                };
+
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                if (response.ok) {
+                    showAlert('Settings saved successfully!', 'success');
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to save settings');
+                }
+            } catch (error) {
+                showAlert('Error saving settings: ' + error.message, 'error');
+            }
+        });
+
+        // Reset to defaults
+        document.getElementById('reset-btn').addEventListener('click', function() {
+            if (confirm('Reset all settings to defaults? This cannot be undone.')) {
+                const defaults = {
+                    date_format: '%Y%m%d',
+                    file_organization: 'import_date',
+                    preserve_folder_structure: true,
+                    duplicate_handling: {
+                        check_scope: 'device_and_date',
+                        comparison_method: 'checksum'
+                    },
+                    user_interaction: {
+                        interface_type: 'web',
+                        web_port: 8080,
+                        require_confirmation: true,
+                        timeout_seconds: 300
+                    },
+                    transfer_settings: {
+                        transfer_mode: 'auto',
+                        nas_timeout_seconds: 10,
+                        local_storage_path: '/home/pi/photos_temp',
+                        nas_storage_path: '/mnt/nas/Photos',
+                        verify_checksums: true,
+                        delete_after_transfer: true,
+                        preserve_timestamps: true
+                    },
+                    network_settings: {
+                        nas_test_command: 'ping -c 1 -W 5 synology.local',
+                        vpn_check_command: 'ip route | grep -q tun0',
+                        fallback_to_local: true
+                    }
+                };
+                
+                populateFormFields(defaults);
+            }
+        });
+
+        function showAlert(message, type) {
+            alert.textContent = message;
+            alert.className = `alert alert-${type}`;
+            alert.classList.remove('hidden');
+            
+            setTimeout(() => {
+                alert.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Load settings on page load
+        loadSettings();
+    </script>
+</body>
+</html>
