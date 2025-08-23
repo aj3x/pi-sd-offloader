@@ -4,9 +4,13 @@ set -e
 # Pi SD Offloader - Main processing script
 # Usage: proto.sh [SOURCE_PATH] [DESTINATION_PATH]
 
+
+# List of accepted file types (extensions, lowercase, no dot)
+ACCEPTED_TYPES=(jpg jpeg mp4 mov heic heif png arw)
+
 # Default paths for testing
 DEFAULT_SRC="/Volumes/Untitled"
-DEFAULT_DEST="$(pwd)/test/dest"
+DEFAULT_DEST="/mnt/test/dest"
 
 # Accept command line parameters
 SRC="${1:-$DEFAULT_SRC}"
@@ -34,22 +38,28 @@ if [ ! -d "$SRC/DCIM" ]; then
 fi
 
 # Check that it is not empty and contains files
-if [ -z "$(find "$SRC/DCIM" -name "*.jpg" -o -name "*.jpeg" -o -name "*.mp4" -o -name "*.mov" -o -name "*.heic" -o -name "*.heif" -o -name "*.png" -o -name "*.arw" 2>/dev/null | head -n 1)" ]; then
+
+# Build find expression for accepted types
+FIND_EXPR=""
+for ext in "${ACCEPTED_TYPES[@]}"; do
+    FIND_EXPR+=" -o -iname '*.$ext'"
+done
+FIND_EXPR="${FIND_EXPR:4}" # Remove leading ' -o'
+
+if [ -z "$(eval find "$SRC/DCIM" $FIND_EXPR 2>/dev/null | head -n 1)" ]; then
     log "ERROR: No valid media files found in DCIM directory: $SRC/DCIM"
     exit 1
 fi
 
 # Get first media file for camera detection
-first_media_file=$(find "$SRC/DCIM" -type f \
-    \( -iname "*.jpg" -o \
-       -iname "*.jpeg" -o \
-       -iname "*.mp4" -o \
-       -iname "*.mov" -o \
-       -iname "*.heic" -o \
-       -iname "*.heif" -o \
-       -iname "*.png" -o \
-       -iname "*.arw" \
-    \) | head -n 1)
+
+# Build find expression for first media file
+FIRST_MEDIA_EXPR=""
+for ext in "${ACCEPTED_TYPES[@]}"; do
+    FIRST_MEDIA_EXPR+=" -o -iname '*.$ext'"
+done
+FIRST_MEDIA_EXPR="${FIRST_MEDIA_EXPR:4}"
+first_media_file=$(eval find "$SRC/DCIM" -type f $FIRST_MEDIA_EXPR | head -n 1)
 
 if [ -z "$first_media_file" ]; then
     log "ERROR: No valid media files found in source: $SRC"
@@ -60,14 +70,15 @@ fi
 # 1. Determine camera type
 log "Detecting camera type from: $first_media_file"
 camera_type="Unknown"
+exifData=$(exiftool "$first_media_file")
 
-if exiftool "$first_media_file" | grep -q "DJI OsmoPocket3"; then
+if echo "$exifData" | grep -q "DJI OsmoPocket3"; then
     camera_type="DJI Osmo Pocket 3"
     log "Camera detected: DJI Osmo Pocket 3"
-elif exiftool "$first_media_file" | grep -q "ILCE-7C"; then
+elif echo "$exifData" | grep -q "ILCE-7C"; then
     camera_type="Sony A7C"
     log "Camera detected: Sony A7C"
-elif exiftool "$first_media_file" | grep -q "FinePix XP150"; then
+elif echo "$exifData" | grep -q "FinePix XP150"; then
     camera_type="Fujifilm FP XP150"
     log "Camera detected: Fujifilm FP XP150"
 else
@@ -93,21 +104,13 @@ mkdir -p "$DEST"
 
 # 2. Copy files using rsync
 log "Copying files from $SRC to $DEST..."
-if rsync -ahv --progress --checksum \
-    --exclude='.*' \
-    --include='DCIM/**' \
-    --include='PRIVATE/M4ROOT/CLIP/**' \
-    --include='*/' \
-    --include='*.jpg' \
-    --include='*.jpeg' \
-    --include='*.mp4' \
-    --include='*.mov' \
-    --include='*.heic' \
-    --include='*.heif' \
-    --include='*.png' \
-    --include='*.arw' \
-    --exclude='*' \
-    "$SRC/" "$DEST/"; then
+RSYNC_INCLUDES=(--include='DCIM/**' --include='PRIVATE/M4ROOT/CLIP/**' --include='*/')
+for ext in "${ACCEPTED_TYPES[@]}"; do
+    RSYNC_INCLUDES+=(--include="*.$ext")
+done
+RSYNC_INCLUDES+=(--exclude='*')
+
+if rsync -ahv --progress --checksum --prune-empty-dirs --exclude='.*' "${RSYNC_INCLUDES[@]}" "$SRC/" "$DEST/"; then
     log "File copy completed successfully"
 else
     log "ERROR: File copy failed"
@@ -121,16 +124,21 @@ log "Running checksum verification..."
 SRC_CHECKSUM="/tmp/source_checksum_$(date +%s).txt"
 DEST_CHECKSUM="/tmp/dest_checksum_$(date +%s).txt"
 
+
+# Build grep pattern for accepted types
+GREP_PATTERN="\\.($(IFS='|'; echo "${ACCEPTED_TYPES[*]}"))$"
+
 cd "$SRC"
 # Find files, handling cases where PRIVATE directory might not exist
 (find "DCIM" -type f 2>/dev/null || true; find "PRIVATE/M4ROOT/CLIP" -type f 2>/dev/null || true) | \
-grep -E '\.(jpg|jpeg|mp4|mov|heic|heif|png|arw)$' | \
+grep -E "$GREP_PATTERN" | \
 grep -v '/\.' | grep -v '/._' | \
 sort | xargs -I {} sha256sum "{}" | sort > "$SRC_CHECKSUM"
 
+
 cd "$DEST"
 (find "DCIM" -type f 2>/dev/null || true; find "PRIVATE/M4ROOT/CLIP" -type f 2>/dev/null || true) | \
-grep -E '\.(jpg|jpeg|mp4|mov|heic|heif|png|arw)$' | \
+grep -E "$GREP_PATTERN" | \
 grep -v '/\.' | grep -v '/._' | \
 sort | xargs -I {} sha256sum "{}" | sort > "$DEST_CHECKSUM"
 
@@ -138,6 +146,7 @@ if diff "$SRC_CHECKSUM" "$DEST_CHECKSUM" > /dev/null; then
     log "✓ Checksums match. Transfer verified successfully."
     log "Files are safe to delete from SD card."
     # Uncomment the next line to enable automatic deletion after successful verification
+    # TODO: Implement automatic deletion
     # rm -rf "$SRC"/*
     log "NOTICE: Automatic deletion is disabled for safety. Enable it by uncommenting line in script."
 else
