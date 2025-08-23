@@ -1,0 +1,154 @@
+# Camera Configuration for Pi SD Offloader
+# This file defines camera detection rules and file processing patterns
+
+cameras:
+  sony_a7c:
+    name: "Sony A7C"
+    detection_rules:
+      folder_structure:
+        - path: "DCIM"
+          required: true
+        - path: "PRIVATE/M4ROOT/CLIP"
+          required: true
+        - path: "AVF_INFO"
+          required: false
+      file_patterns:
+        - pattern: "A7C*.ARW"
+          confidence: 90
+        - pattern: "A7C*.JPG"
+          confidence: 85
+      exif_rules:
+        make: "Sony"
+        model_contains: ["A7C"]
+        confidence: 95
+    
+    file_sources:
+      photos:
+        - path: "DCIM"
+          extensions: [".ARW", ".JPG", ".JPEG"]
+          recursive: true
+      videos:
+        - path: "PRIVATE/M4ROOT/CLIP"
+          extensions: [".MP4", ".MOV"]
+          recursive: false
+    
+    destination_structure: "Sony A7C/{date}/{type}"
+
+  fujifilm_xp150:
+    name: "Fujifilm XP150"
+    detection_rules:
+      folder_structure:
+        - path: "DCIM/100_FUJI"
+          required: true
+        - path: "FGPS"
+          required: true
+      file_patterns:
+        - pattern: "DSCF*.JPG"
+          confidence: 85
+        - pattern: "DSCF*.MOV"
+          confidence: 85
+      exif_rules:
+        make: "FUJIFILM"
+        model_contains: ["XP150"]
+        confidence: 95
+    
+    file_sources:
+      photos:
+        - path: "DCIM/100_FUJI"
+          extensions: [".JPG", ".JPEG"]
+          recursive: false
+      videos:
+        - path: "DCIM/100_FUJI"
+          extensions: [".MOV", ".MP4"]
+          recursive: false
+    
+    destination_structure: "Fujifilm XP150/{date}/DCIM"
+
+  dji_osmo_pocket_3:
+    name: "DJI Osmo Pocket 3"
+    detection_rules:
+      folder_structure:
+        - path: "DCIM/DJI_001"
+          required: true
+        - path: "MISC/M4ROOT"
+          required: true
+      file_patterns:
+        - pattern: "DJI_*.LRF"
+          confidence: 90
+        - pattern: "DJI_*.MP4"
+          confidence: 85
+        - pattern: "DJI_*.WAV"
+          confidence: 80
+      exif_rules:
+        make: "DJI"
+        model_contains: ["Osmo", "Pocket"]
+        confidence: 95
+    
+    file_sources:
+      photos:
+        - path: "DCIM/DJI_001"
+          extensions: [".LRF", ".JPG", ".JPEG"]
+          recursive: false
+      videos:
+        - path: "DCIM/DJI_001"
+          extensions: [".MP4", ".MOV"]
+          recursive: false
+      audio:
+        - path: "DCIM/DJI_001"
+          extensions: [".WAV", ".MP3"]
+          recursive: false
+    
+    destination_structure: "DJI Osmo Pocket 3/{date}/DCIM"
+
+  # Template for adding new cameras
+  insta360_go3:
+    name: "Insta360 Go3"
+    connection_type: "mtp"  # USB MTP device, not SD card
+    detection_rules:
+      usb_vendor_id: "2e1a"
+      usb_product_id: "4c01"
+      mtp_device_name: "Insta360 GO 3"
+    
+    file_sources:
+      videos:
+        - path: "DCIM"
+          extensions: [".MP4", ".INSV"]
+          recursive: true
+      photos:
+        - path: "DCIM"
+          extensions: [".JPG", ".JPEG", ".INSP"]
+          recursive: true
+    
+    destination_structure: "Insta360 Go3/{date}/DCIM"
+
+# Global settings
+settings:
+  date_format: "%Y%m%d"  # YYYYMMDD
+  file_organization: "import_date"  # Files organized by import date
+  preserve_folder_structure: true
+  
+  duplicate_handling:
+    check_scope: "device_and_date"  # Per device per day only
+    comparison_method: "checksum"   # checksum, filename, or both
+    
+  user_interaction:
+    interface_type: "web"  # Web interface for user confirmations
+    web_port: 8080
+    require_confirmation: true
+    timeout_seconds: 300  # Auto-proceed after 5 minutes if no response
+  
+  transfer_settings:
+    # Support both direct NAS and local-first modes
+    transfer_mode: "auto"  # auto, direct_nas, local_first
+    nas_timeout_seconds: 10
+    local_storage_path: "/home/pi/photos_temp"
+    nas_storage_path: "/mnt/nas/Photos"
+    verify_checksums: true
+    delete_after_transfer: true
+    preserve_timestamps: true
+    buffer_size: "64KB"
+    
+  network_settings:
+    nas_test_command: "ping -c 1 -W 5 synology.local"
+    vpn_check_command: "ip route | grep -q tun0"
+    fallback_to_local: true
