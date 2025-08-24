@@ -6,11 +6,18 @@ set -e
 
 
 # List of accepted file types (extensions, lowercase, no dot)
-ACCEPTED_TYPES=(jpg jpeg mp4 mov heic heif png arw)
+ACCEPTED_TYPES=(jpg jpeg mp4 mov heic heif png arw raw)
+
 
 # Default paths for testing
 DEFAULT_SRC="/Volumes/Untitled"
-DEFAULT_DEST="/mnt/test/dest"
+# Source config file for DEFAULT_DEST
+CONFIG_FILE="$(dirname "$0")/../config.env"
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
+else
+    DEFAULT_DEST="/mnt/nas/photos"
+fi
 
 # Accept command line parameters
 SRC="${1:-$DEFAULT_SRC}"
