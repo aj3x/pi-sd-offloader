@@ -12,7 +12,7 @@ ACCEPTED_TYPES=(jpg jpeg mp4 mov heic heif png arw raw)
 # Default paths for testing
 DEFAULT_SRC="/Volumes/Untitled"
 # Source config file for DEFAULT_DEST
-CONFIG_FILE="$(dirname "$0")/../config.env"
+CONFIG_FILE="/etc/pi-sd-offloader/config.env"
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 else
