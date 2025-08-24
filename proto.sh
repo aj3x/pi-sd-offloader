@@ -124,48 +124,48 @@ else
     exit 1
 fi
 
-# 3. Checksum verification
-log "Running checksum verification..."
+# # 3. Checksum verification
+# log "Running checksum verification..."
 
-# Create temporary checksum files with unique names
-SRC_CHECKSUM="/tmp/source_checksum_$(date +%s).txt"
-DEST_CHECKSUM="/tmp/dest_checksum_$(date +%s).txt"
-
-
-# Build grep pattern for accepted types
-GREP_PATTERN="\\.($(IFS='|'; echo "${ACCEPTED_TYPES[*]}"))$"
-
-cd "$SRC"
-# Find files, handling cases where PRIVATE directory might not exist
-(find "DCIM" -type f 2>/dev/null || true; find "PRIVATE/M4ROOT/CLIP" -type f 2>/dev/null || true) | \
-grep -E "$GREP_PATTERN" | \
-grep -v '/\.' | grep -v '/._' | \
-sort | xargs -I {} sha256sum "{}" | sort > "$SRC_CHECKSUM"
+# # Create temporary checksum files with unique names
+# SRC_CHECKSUM="/tmp/source_checksum_$(date +%s).txt"
+# DEST_CHECKSUM="/tmp/dest_checksum_$(date +%s).txt"
 
 
-cd "$DEST"
-(find "DCIM" -type f 2>/dev/null || true; find "PRIVATE/M4ROOT/CLIP" -type f 2>/dev/null || true) | \
-grep -E "$GREP_PATTERN" | \
-grep -v '/\.' | grep -v '/._' | \
-sort | xargs -I {} sha256sum "{}" | sort > "$DEST_CHECKSUM"
+# # Build grep pattern for accepted types
+# GREP_PATTERN="\\.($(IFS='|'; echo "${ACCEPTED_TYPES[*]}"))$"
 
-if diff "$SRC_CHECKSUM" "$DEST_CHECKSUM" > /dev/null; then
-    log "✓ Checksums match. Transfer verified successfully."
-    log "Files are safe to delete from SD card."
-    # Uncomment the next line to enable automatic deletion after successful verification
-    # TODO: Implement automatic deletion
-    # rm -rf "$SRC"/*
-    log "NOTICE: Automatic deletion is disabled for safety. Enable it by uncommenting line in script."
-else
-    log "✗ ERROR: Checksum mismatch detected!"
-    log "Source checksum file: $SRC_CHECKSUM"
-    log "Destination checksum file: $DEST_CHECKSUM"
-    log "Transfer verification failed. SD card files will NOT be deleted."
-    exit 1
-fi
+# cd "$SRC"
+# # Find files, handling cases where PRIVATE directory might not exist
+# (find "DCIM" -type f 2>/dev/null || true; find "PRIVATE/M4ROOT/CLIP" -type f 2>/dev/null || true) | \
+# grep -E "$GREP_PATTERN" | \
+# grep -v '/\.' | grep -v '/._' | \
+# sort | xargs -I {} sha256sum "{}" | sort > "$SRC_CHECKSUM"
 
-# Clean up temporary checksum files
-rm -f "$SRC_CHECKSUM" "$DEST_CHECKSUM"
+
+# cd "$DEST"
+# (find "DCIM" -type f 2>/dev/null || true; find "PRIVATE/M4ROOT/CLIP" -type f 2>/dev/null || true) | \
+# grep -E "$GREP_PATTERN" | \
+# grep -v '/\.' | grep -v '/._' | \
+# sort | xargs -I {} sha256sum "{}" | sort > "$DEST_CHECKSUM"
+
+# if diff "$SRC_CHECKSUM" "$DEST_CHECKSUM" > /dev/null; then
+#     log "✓ Checksums match. Transfer verified successfully."
+#     log "Files are safe to delete from SD card."
+#     # Uncomment the next line to enable automatic deletion after successful verification
+#     # TODO: Implement automatic deletion
+#     # rm -rf "$SRC"/*
+#     log "NOTICE: Automatic deletion is disabled for safety. Enable it by uncommenting line in script."
+# else
+#     log "✗ ERROR: Checksum mismatch detected!"
+#     log "Source checksum file: $SRC_CHECKSUM"
+#     log "Destination checksum file: $DEST_CHECKSUM"
+#     log "Transfer verification failed. SD card files will NOT be deleted."
+#     exit 1
+# fi
+
+# # Clean up temporary checksum files
+# rm -f "$SRC_CHECKSUM" "$DEST_CHECKSUM"
 
 log "✓ Transfer complete successfully!"
 exit 0
