@@ -17,6 +17,7 @@ if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 else
     DEFAULT_DEST="/mnt/nas/photos"
+    DEFAULT_DELETE_AFTER_TRANSFER=true
 fi
 
 # Accept command line parameters
@@ -117,6 +118,12 @@ for ext in "${ACCEPTED_TYPES[@]}"; do
 done
 RSYNC_INCLUDES+=(--exclude='*')
 
+# verify rsync exists
+if ! command -v rsync &> /dev/null; then
+    log "ERROR: rsync is not installed"
+    exit 1
+fi
+
 if rsync -ahv --progress --checksum --prune-empty-dirs --exclude='.*' "${RSYNC_INCLUDES[@]}" "$SRC/" "$DEST/"; then
     log "File copy completed successfully"
 else
@@ -166,6 +173,14 @@ fi
 
 # # Clean up temporary checksum files
 # rm -f "$SRC_CHECKSUM" "$DEST_CHECKSUM"
+
+# Delete Files on Source SD Card
+if [ "$DEFAULT_DELETE_AFTER_TRANSFER" = true ]; then
+    log "Deleting files from source: $SRC"
+    rm -rf "$SRC"/*
+else
+    log "NOTICE: Automatic deletion is disabled. Enable it by setting DEFAULT_DELETE_AFTER_TRANSFER=true"
+fi
 
 log "✓ Transfer complete successfully!"
 exit 0
