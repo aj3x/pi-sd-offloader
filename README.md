@@ -15,6 +15,9 @@ This system waits for an SD card to be plugged in and then begins pulling the fi
 - **Extensible Configuration**: Easy to add new cameras via YAML config
 
 ## Quick Start
+### Required Tools
+- rsync
+- exiftool
 
 ### Installation on Raspberry Pi
 
@@ -22,7 +25,11 @@ This system waits for an SD card to be plugged in and then begins pulling the fi
 # Clone the repository
 git clone https://github.com/yourusername/pi-sd-offloader.git
 cd pi-sd-offloader
+```
 
+Open `config.env` and edit to your needs
+
+```bash
 # Run installation script (requires sudo)
 sudo ./scripts/install.sh
 ```

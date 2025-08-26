@@ -24,15 +24,19 @@ fi
 SRC="${1:-$DEFAULT_SRC}"
 DEST="${2:-$DEFAULT_DEST}"
 
-# If DEST is not absolute, make it relative to script directory
-if [[ "$DEST" != /* ]]; then
-    DEST="$(pwd)/$DEST"
-fi
 
 # Logging function
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [Proto] $1"
 }
+
+# Verify required commands are available
+for cmd in exiftool rsync; do
+    if ! command -v "$cmd" &> /dev/null; then
+        log "ERROR: $cmd is not installed"
+        exit 1
+    fi
+done
 
 log "Processing SD card from: $SRC"
 log "Destination: $DEST"
@@ -54,7 +58,7 @@ for ext in "${ACCEPTED_TYPES[@]}"; do
 done
 FIND_EXPR="${FIND_EXPR:4}" # Remove leading ' -o'
 
-if [ -z "$(eval find "$SRC/DCIM" $FIND_EXPR 2>/dev/null | head -n 1)" ]; then
+if [ -z "$(eval find "$SRC/DCIM" $FIND_EXPR 2>/dev/null | head -n 1 2>/dev/null)" ]; then
     log "ERROR: No valid media files found in DCIM directory: $SRC/DCIM"
     exit 1
 fi
@@ -93,6 +97,10 @@ else
     exit 1
 fi
 
+if [ -z "$camera_type" ]; then
+    log "ERROR: No camera type detected"
+    exit 1
+fi
 log "Camera type: $camera_type"
 
 # Add camera type to destination path with date
@@ -116,12 +124,6 @@ for ext in "${ACCEPTED_TYPES[@]}"; do
     RSYNC_INCLUDES+=(--include="*.$ext")
 done
 RSYNC_INCLUDES+=(--exclude='*')
-
-# verify rsync exists
-if ! command -v rsync &> /dev/null; then
-    log "ERROR: rsync is not installed"
-    exit 1
-fi
 
 if rsync -ahv --progress --checksum --prune-empty-dirs --exclude='.*' "${RSYNC_INCLUDES[@]}" "$SRC/" "$DEST/"; then
     log "File copy completed successfully"
