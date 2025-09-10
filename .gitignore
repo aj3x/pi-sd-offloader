@@ -1,4 +1,8 @@
 # macOS
 .DS_Store
 
-.claude
+# Claude files
+.claude/
+
+# test files
+test/*
