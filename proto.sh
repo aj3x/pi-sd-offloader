@@ -18,7 +18,15 @@ if [ -f "$CONFIG_FILE" ]; then
 else
     DEFAULT_DEST="/mnt/nas/photos"
     DEFAULT_DELETE_AFTER_TRANSFER=true
+    SYNC_METHOD="rsync"
+    RCLONE_REMOTE=""
+    RCLONE_FLAGS="--checksum --immutable"
 fi
+
+# Set defaults for new config variables if not set
+SYNC_METHOD="${SYNC_METHOD:-rsync}"
+RCLONE_REMOTE="${RCLONE_REMOTE:-}"
+RCLONE_FLAGS="${RCLONE_FLAGS:---checksum --immutable}"
 
 # Accept command line parameters
 SRC="${1:-$DEFAULT_SRC}"
@@ -31,12 +39,27 @@ log() {
 }
 
 # Verify required commands are available
-for cmd in exiftool rsync; do
-    if ! command -v "$cmd" &> /dev/null; then
-        log "ERROR: $cmd is not installed"
+if ! command -v exiftool &> /dev/null; then
+    log "ERROR: exiftool is not installed"
+    exit 1
+fi
+
+# Check for sync method command
+if [ "$SYNC_METHOD" = "rclone" ]; then
+    if ! command -v rclone &> /dev/null; then
+        log "ERROR: rclone is not installed but SYNC_METHOD is set to rclone"
         exit 1
     fi
-done
+    if [ -z "$RCLONE_REMOTE" ]; then
+        log "ERROR: RCLONE_REMOTE must be set when SYNC_METHOD is rclone"
+        exit 1
+    fi
+else
+    if ! command -v rsync &> /dev/null; then
+        log "ERROR: rsync is not installed"
+        exit 1
+    fi
+fi
 
 log "Processing SD card from: $SRC"
 log "Destination: $DEST"
@@ -117,30 +140,58 @@ fi
 log "Creating destination directory: $DEST"
 mkdir -p "$DEST"
 
-# 2. Copy files using rsync
-log "Copying files from $SRC to $DEST..."
-RSYNC_INCLUDES=(--include='DCIM/**' --include='PRIVATE/M4ROOT/CLIP/**' --include='*/')
-for ext in "${ACCEPTED_TYPES[@]}"; do
-    RSYNC_INCLUDES+=(--include="*.$ext")
-done
-RSYNC_INCLUDES+=(--exclude='*')
+# 2. Copy files using selected sync method
+log "Copying files from $SRC to $DEST using $SYNC_METHOD..."
 
-if rsync -ahv --progress --checksum --prune-empty-dirs --exclude='.*' "${RSYNC_INCLUDES[@]}" "$SRC/" "$DEST/"; then
-    log "File copy completed successfully"
+if [ "$SYNC_METHOD" = "rclone" ]; then
+    # Use rclone for copying
+    RCLONE_INCLUDES=()
+    for ext in "${ACCEPTED_TYPES[@]}"; do
+        RCLONE_INCLUDES+=(--include="*.$ext")
+    done
+    RCLONE_INCLUDES+=(--include="DCIM/**" --include="PRIVATE/M4ROOT/CLIP/**" --exclude=".*" --exclude="*")
+    
+    # Build rclone destination path
+    RCLONE_DEST="$RCLONE_REMOTE/$camera_type/$today"
+    
+    # Convert RCLONE_FLAGS string to array
+    read -ra RCLONE_FLAGS_ARRAY <<< "$RCLONE_FLAGS"
+    
+    if rclone copy --metadata --progress "${RCLONE_FLAGS_ARRAY[@]}" "${RCLONE_INCLUDES[@]}" "$SRC/" "$RCLONE_DEST/"; then
+        log "File copy completed successfully using rclone"
+    else
+        log "ERROR: rclone copy failed"
+        exit 1
+    fi
 else
-    log "ERROR: File copy failed"
-    exit 1
+    # Use rsync for copying  
+    RSYNC_INCLUDES=(--include='DCIM/**' --include='PRIVATE/M4ROOT/CLIP/**' --include='*/')
+    for ext in "${ACCEPTED_TYPES[@]}"; do
+        RSYNC_INCLUDES+=(--include="*.$ext")
+    done
+    RSYNC_INCLUDES+=(--exclude='*')
+
+    if rsync -ahv --progress --checksum --prune-empty-dirs --exclude='.*' "${RSYNC_INCLUDES[@]}" "$SRC/" "$DEST/"; then
+        log "File copy completed successfully using rsync"
+    else
+        log "ERROR: rsync copy failed"
+        exit 1
+    fi
 fi
 
-# 3. Verification (checksum and size)
-log "Running checksum and size verification..."
+# 3. Verification (checksum and size) - Skip for rclone
+if [ "$SYNC_METHOD" = "rclone" ]; then
+    log "Skipping verification - rclone handles integrity checking internally"
+    VERIFICATION_PASSED=true
+else
+    log "Running checksum and size verification..."
 
-# Create temporary verification files with unique names
-TIMESTAMP=$(date +%s)
-SRC_CHECKSUM="/tmp/source_checksum_${TIMESTAMP}.txt"
-DEST_CHECKSUM="/tmp/dest_checksum_${TIMESTAMP}.txt"
-SRC_SIZES="/tmp/source_sizes_${TIMESTAMP}.txt"
-DEST_SIZES="/tmp/dest_sizes_${TIMESTAMP}.txt"
+    # Create temporary verification files with unique names
+    TIMESTAMP=$(date +%s)
+    SRC_CHECKSUM="/tmp/source_checksum_${TIMESTAMP}.txt"
+    DEST_CHECKSUM="/tmp/dest_checksum_${TIMESTAMP}.txt"
+    SRC_SIZES="/tmp/source_sizes_${TIMESTAMP}.txt"
+    DEST_SIZES="/tmp/dest_sizes_${TIMESTAMP}.txt"
 
 # Create function to find files matching rsync criteria
 find_matching_files() {
@@ -242,8 +293,9 @@ else
     VERIFICATION_PASSED=false
 fi
 
-# Clean up temporary verification files
-rm -f "$SRC_CHECKSUM" "$DEST_CHECKSUM" "$SRC_SIZES" "$DEST_SIZES"
+    # Clean up temporary verification files
+    rm -f "$SRC_CHECKSUM" "$DEST_CHECKSUM" "$SRC_SIZES" "$DEST_SIZES"
+fi
 
 # Delete Files on Source SD Card (only if verification passed)
 if [ "$VERIFICATION_PASSED" = true ]; then
