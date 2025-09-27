@@ -23,8 +23,10 @@ mkdir -p "$INSTALL_DIR"
 # Copy scripts to installation directory
 echo "📄 Copying scripts..."
 cp "$PROJECT_ROOT/proto.sh" "$INSTALL_DIR/"
+cp "$PROJECT_ROOT/discord.sh" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/sd-card-handler.sh" "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/proto.sh"
+chmod +x "$INSTALL_DIR/discord.sh"
 chmod +x "$INSTALL_DIR/sd-card-handler.sh"
 
 # Copy config file to /etc/pi-sd-offloader/

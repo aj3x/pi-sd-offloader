@@ -1,6 +1,12 @@
 #!/bin/bash
 # Load Discord webhook config from environment file
-source "$(dirname "$0")/config.env"
+CONFIG_FILE="/etc/pi-sd-offloader/config.env"
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
+else
+    echo "Error: Config file $CONFIG_FILE not found." >&2
+    exit 1
+fi
 
 # Check required variables
 if [[ -z "$DISCORD_WEBHOOK_URL" || -z "$DISCORD_USERNAME" || -z "$DISCORD_AVATAR_URL" ]]; then
