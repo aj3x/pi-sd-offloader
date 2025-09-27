@@ -4,6 +4,9 @@ set -e
 # Pi SD Offloader - Main processing script
 # Usage: proto.sh [SOURCE_PATH] [DESTINATION_PATH]
 
+# import discord messaging function
+source "$(dirname "$0")/discord.sh"
+
 
 # List of accepted file types (extensions, lowercase, no dot)
 ACCEPTED_TYPES=(jpg jpeg mp4 mov heic heif png arw raw)
@@ -36,6 +39,7 @@ DEST="${2:-$DEFAULT_DEST}"
 # Logging function
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [Proto] $1"
+    discord_message "$1"
 }
 
 # Verify required commands are available
