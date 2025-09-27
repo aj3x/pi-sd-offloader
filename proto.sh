@@ -58,9 +58,12 @@ if [ "$SYNC_METHOD" = "rclone" ]; then
         log "ERROR: RCLONE_REMOTE must be set when SYNC_METHOD is rclone"
         exit 1
     fi
+    # Extract remote name from RCLONE_REMOTE (handle both "remote" and "remote:path" formats)
+    REMOTE_NAME=$(echo "$RCLONE_REMOTE" | cut -d':' -f1)
+    
     # Check if the rclone remote exists
-    if ! rclone listremotes | grep -q "^${RCLONE_REMOTE}:$"; then
-        log "ERROR: rclone remote '$RCLONE_REMOTE' not found in configuration"
+    if ! rclone listremotes | grep -q "^${REMOTE_NAME}:$"; then
+        log "ERROR: rclone remote '$REMOTE_NAME' not found in configuration"
         log "Available remotes: $(rclone listremotes | tr '\n' ' ')"
         log "Run 'rclone config' to configure the remote"
         exit 1
