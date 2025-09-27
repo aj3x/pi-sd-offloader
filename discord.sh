@@ -19,5 +19,3 @@ discord_message() {
 
 # Usage example:
 # discord_message "Hello from shell script!"
-
-discord_message "Script discord.sh has been executed."
