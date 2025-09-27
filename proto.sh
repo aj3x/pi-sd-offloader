@@ -30,6 +30,7 @@ fi
 SYNC_METHOD="${SYNC_METHOD:-rsync}"
 RCLONE_REMOTE="${RCLONE_REMOTE:-}"
 RCLONE_FLAGS="${RCLONE_FLAGS:---checksum --immutable}"
+RCLONE_CONFIG="${RCLONE_CONFIG:-}"
 
 # Accept command line parameters
 SRC="${1:-$DEFAULT_SRC}"
@@ -61,10 +62,16 @@ if [ "$SYNC_METHOD" = "rclone" ]; then
     # Extract remote name from RCLONE_REMOTE (handle both "remote" and "remote:path" formats)
     REMOTE_NAME=$(echo "$RCLONE_REMOTE" | cut -d':' -f1)
     
+    # Build rclone command with optional config file
+    RCLONE_CMD="rclone"
+    if [ -n "$RCLONE_CONFIG" ]; then
+        RCLONE_CMD="rclone --config $RCLONE_CONFIG"
+    fi
+    
     # Check if the rclone remote exists
-    if ! rclone listremotes | grep -q "^${REMOTE_NAME}:$"; then
+    if ! $RCLONE_CMD listremotes | grep -q "^${REMOTE_NAME}:$"; then
         log "ERROR: rclone remote '$REMOTE_NAME' not found in configuration"
-        log "Available remotes: $(rclone listremotes | tr '\n' ' ')"
+        log "Available remotes: $($RCLONE_CMD listremotes | tr '\n' ' ')"
         log "Run 'rclone config' to configure the remote"
         exit 1
     fi
@@ -190,7 +197,7 @@ if [ "$SYNC_METHOD" = "rclone" ]; then
     # Convert RCLONE_FLAGS string to array
     read -ra RCLONE_FLAGS_ARRAY <<< "$RCLONE_FLAGS"
     
-    if rclone copy --metadata --progress "${RCLONE_FLAGS_ARRAY[@]}" "${RCLONE_FILTERS[@]}" "$SRC/" "$RCLONE_DEST/"; then
+    if $RCLONE_CMD copy --metadata --progress "${RCLONE_FLAGS_ARRAY[@]}" "${RCLONE_FILTERS[@]}" "$SRC/" "$RCLONE_DEST/"; then
         log "File copy completed successfully using rclone"
     else
         log "ERROR: rclone copy failed"
