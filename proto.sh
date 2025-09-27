@@ -58,6 +58,13 @@ if [ "$SYNC_METHOD" = "rclone" ]; then
         log "ERROR: RCLONE_REMOTE must be set when SYNC_METHOD is rclone"
         exit 1
     fi
+    # Check if the rclone remote exists
+    if ! rclone listremotes | grep -q "^${RCLONE_REMOTE}:$"; then
+        log "ERROR: rclone remote '$RCLONE_REMOTE' not found in configuration"
+        log "Available remotes: $(rclone listremotes | tr '\n' ' ')"
+        log "Run 'rclone config' to configure the remote"
+        exit 1
+    fi
 else
     if ! command -v rsync &> /dev/null; then
         log "ERROR: rsync is not installed"
@@ -66,9 +73,12 @@ else
 fi
 
 log "Processing SD card from: $SRC"
-log "Destination: $DEST"
 
-mkdir -p "$DEST"
+# For rclone, we'll set the final destination later after camera detection
+if [ "$SYNC_METHOD" != "rclone" ]; then
+    log "Destination: $DEST"
+    mkdir -p "$DEST"
+fi
 
 # Check that DCIM directory exists
 if [ ! -d "$SRC/DCIM" ]; then
@@ -132,20 +142,33 @@ log "Camera type: $camera_type"
 
 # Add camera type to destination path with date
 today=$(date +%Y%m%d)
-DEST="$DEST/$camera_type/$today"
 
-# Validate path doesn't already exist (prevents overwriting)
-if [ -d "$DEST" ]; then
-    log "ERROR: Destination path already exists: $DEST"
-    log "This prevents accidental overwriting. Remove the directory or change the date if this is intentional."
-    exit 1
+if [ "$SYNC_METHOD" = "rclone" ]; then
+    # For rclone, we'll use the remote path directly
+    RCLONE_DEST="$RCLONE_REMOTE/$camera_type/$today"
+    log "Destination: $RCLONE_DEST (rclone remote)"
+else
+    # For rsync, modify the local destination path
+    DEST="$DEST/$camera_type/$today"
+    log "Destination: $DEST"
+    
+    # Validate path doesn't already exist (prevents overwriting)
+    if [ -d "$DEST" ]; then
+        log "ERROR: Destination path already exists: $DEST"
+        log "This prevents accidental overwriting. Remove the directory or change the date if this is intentional."
+        exit 1
+    fi
+
+    log "Creating destination directory: $DEST"
+    mkdir -p "$DEST"
 fi
 
-log "Creating destination directory: $DEST"
-mkdir -p "$DEST"
-
 # 2. Copy files using selected sync method
-log "Copying files from $SRC to $DEST using $SYNC_METHOD..."
+if [ "$SYNC_METHOD" = "rclone" ]; then
+    log "Copying files from $SRC to $RCLONE_DEST using $SYNC_METHOD..."
+else
+    log "Copying files from $SRC to $DEST using $SYNC_METHOD..."
+fi
 
 if [ "$SYNC_METHOD" = "rclone" ]; then
     # Use rclone for copying with --filter instead of mixed --include/--exclude
@@ -160,9 +183,6 @@ if [ "$SYNC_METHOD" = "rclone" ]; then
         --filter="- .*"
         --filter="- *"
     )
-    
-    # Build rclone destination path
-    RCLONE_DEST="$RCLONE_REMOTE/$camera_type/$today"
     
     # Convert RCLONE_FLAGS string to array
     read -ra RCLONE_FLAGS_ARRAY <<< "$RCLONE_FLAGS"
