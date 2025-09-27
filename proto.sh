@@ -148,12 +148,18 @@ mkdir -p "$DEST"
 log "Copying files from $SRC to $DEST using $SYNC_METHOD..."
 
 if [ "$SYNC_METHOD" = "rclone" ]; then
-    # Use rclone for copying
-    RCLONE_INCLUDES=()
+    # Use rclone for copying with --filter instead of mixed --include/--exclude
+    RCLONE_FILTERS=(
+        --filter="+ DCIM/**"
+        --filter="+ PRIVATE/M4ROOT/CLIP/**"
+    )
     for ext in "${ACCEPTED_TYPES[@]}"; do
-        RCLONE_INCLUDES+=(--include="*.$ext")
+        RCLONE_FILTERS+=(--filter="+ *.$ext")
     done
-    RCLONE_INCLUDES+=(--include="DCIM/**" --include="PRIVATE/M4ROOT/CLIP/**" --exclude=".*" --exclude="*")
+    RCLONE_FILTERS+=(
+        --filter="- .*"
+        --filter="- *"
+    )
     
     # Build rclone destination path
     RCLONE_DEST="$RCLONE_REMOTE/$camera_type/$today"
@@ -161,7 +167,7 @@ if [ "$SYNC_METHOD" = "rclone" ]; then
     # Convert RCLONE_FLAGS string to array
     read -ra RCLONE_FLAGS_ARRAY <<< "$RCLONE_FLAGS"
     
-    if rclone copy --metadata --progress "${RCLONE_FLAGS_ARRAY[@]}" "${RCLONE_INCLUDES[@]}" "$SRC/" "$RCLONE_DEST/"; then
+    if rclone copy --metadata --progress "${RCLONE_FLAGS_ARRAY[@]}" "${RCLONE_FILTERS[@]}" "$SRC/" "$RCLONE_DEST/"; then
         log "File copy completed successfully using rclone"
     else
         log "ERROR: rclone copy failed"
