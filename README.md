@@ -16,8 +16,8 @@ This system waits for an SD card to be plugged in and then begins pulling the fi
 
 ## Quick Start
 ### Required Tools
-- rsync
-- exiftool
+- `rsync` and/or `rclone`
+- `exiftool`
 
 ### Installation on Raspberry Pi
 
@@ -27,11 +27,11 @@ git clone https://github.com/yourusername/pi-sd-offloader.git
 cd pi-sd-offloader
 ```
 
-Open `config.env` and edit to your needs
+Duplicate `config.example.env` to `config.env` and edit to your needs
 
 ```bash
 # Run installation script (requires sudo)
-sudo ./scripts/install.sh
+sudo ./scripts/install-autodetect.sh
 ```
 
 The installer will:
