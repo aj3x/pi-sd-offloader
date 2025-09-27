@@ -27,6 +27,8 @@ git clone https://github.com/yourusername/pi-sd-offloader.git
 cd pi-sd-offloader
 ```
 
+If you are using rclone be sure to run `rclone config` and use this value in your config file
+
 Duplicate `config.example.env` to `config.env` and edit to your needs
 
 ```bash
@@ -38,14 +40,6 @@ The installer will:
 - Install system dependencies (Python, exiftool, rsync, etc.)
 - Set up systemd services for automatic SD card handling
 - Create udev rules for SD card detection
-- Start the web interface on port 8080
-
-### Access Web Interface
-
-After installation, access the web interface at:
-```
-http://your-pi-ip:8080
-```
 
 ## System Architecture
 
@@ -178,9 +172,6 @@ systemctl status sd-card-handler@*
 ```bash
 # Check service status
 sudo systemctl status pi-sd-offloader
-
-# Check if port is bound
-sudo netstat -tlnp | grep :8080
 
 # Restart service
 sudo systemctl restart pi-sd-offloader
