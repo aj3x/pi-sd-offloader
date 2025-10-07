@@ -233,105 +233,105 @@ else
     SRC_SIZES="/tmp/source_sizes_${TIMESTAMP}.txt"
     DEST_SIZES="/tmp/dest_sizes_${TIMESTAMP}.txt"
 
-# Create function to find files matching rsync criteria
-find_matching_files() {
-    local base_dir="$1"
-    local target_dir="$2"
-    
-    # Build find expression for accepted types (same logic as rsync includes)
-    local find_expr=""
-    for ext in "${ACCEPTED_TYPES[@]}"; do
-        find_expr+=" -o -iname '*.$ext'"
-    done
-    find_expr="${find_expr:4}" # Remove leading ' -o'
-    
-    cd "$base_dir"
-    # Find files in DCIM and PRIVATE/M4ROOT/CLIP directories, matching accepted types
-    (
-        if [ -d "DCIM" ]; then
-            eval find "DCIM" -type f $find_expr 2>/dev/null || true
+    # Create function to find files matching rsync criteria
+    find_matching_files() {
+        local base_dir="$1"
+        local target_dir="$2"
+        
+        # Build find expression for accepted types (same logic as rsync includes)
+        local find_expr=""
+        for ext in "${ACCEPTED_TYPES[@]}"; do
+            find_expr+=" -o -iname '*.$ext'"
+        done
+        find_expr="${find_expr:4}" # Remove leading ' -o'
+        
+        cd "$base_dir"
+        # Find files in DCIM and PRIVATE/M4ROOT/CLIP directories, matching accepted types
+        (
+            if [ -d "DCIM" ]; then
+                eval find "DCIM" -type f $find_expr 2>/dev/null || true
+            fi
+            if [ -d "PRIVATE/M4ROOT/CLIP" ]; then
+                eval find "PRIVATE/M4ROOT/CLIP" -type f $find_expr 2>/dev/null || true
+            fi
+        ) | \
+        grep -v '/\.' | grep -v '/._' | \
+        grep -v '/@eaDir/' | \
+        grep -v '/.DS_Store' | \
+        grep -v '/Thumbs.db' | \
+        sort
+    }
+
+    # Generate checksums for source files
+    log "Computing source checksums and sizes..."
+    find_matching_files "$SRC" | while IFS= read -r file; do
+        if [ -f "$SRC/$file" ]; then
+            echo "$file"
         fi
-        if [ -d "PRIVATE/M4ROOT/CLIP" ]; then
-            eval find "PRIVATE/M4ROOT/CLIP" -type f $find_expr 2>/dev/null || true
+    done | xargs -I {} sh -c 'cd "$1" && sha256sum "$2"' _ "$SRC" {} | sort > "$SRC_CHECKSUM"
+
+    # Generate sizes for source files  
+    find_matching_files "$SRC" | while IFS= read -r file; do
+        if [ -f "$SRC/$file" ]; then
+            echo "$file"
         fi
-    ) | \
-    grep -v '/\.' | grep -v '/._' | \
-    grep -v '/@eaDir/' | \
-    grep -v '/.DS_Store' | \
-    grep -v '/Thumbs.db' | \
-    sort
-}
+    done | xargs -I {} sh -c 'cd "$1" && stat -c "%s %n" "$2" 2>/dev/null || stat -f "%z %N" "$2"' _ "$SRC" {} | sort > "$SRC_SIZES"
 
-# Generate checksums for source files
-log "Computing source checksums and sizes..."
-find_matching_files "$SRC" | while IFS= read -r file; do
-    if [ -f "$SRC/$file" ]; then
-        echo "$file"
+    # Generate checksums for destination files
+    log "Computing destination checksums and sizes..."
+    find_matching_files "$DEST" | while IFS= read -r file; do
+        if [ -f "$DEST/$file" ]; then
+            echo "$file"
+        fi
+    done | xargs -I {} sh -c 'cd "$1" && sha256sum "$2"' _ "$DEST" {} | sort > "$DEST_CHECKSUM"
+
+    # Generate sizes for destination files
+    find_matching_files "$DEST" | while IFS= read -r file; do
+        if [ -f "$DEST/$file" ]; then
+            echo "$file"
+        fi
+    done | xargs -I {} sh -c 'cd "$1" && stat -c "%s %n" "$2" 2>/dev/null || stat -f "%z %N" "$2"' _ "$DEST" {} | sort > "$DEST_SIZES"
+
+    # Verify checksums
+    CHECKSUM_MATCH=true
+    if ! diff "$SRC_CHECKSUM" "$DEST_CHECKSUM" > /dev/null; then
+        CHECKSUM_MATCH=false
     fi
-done | xargs -I {} sh -c 'cd "$1" && sha256sum "$2"' _ "$SRC" {} | sort > "$SRC_CHECKSUM"
 
-# Generate sizes for source files  
-find_matching_files "$SRC" | while IFS= read -r file; do
-    if [ -f "$SRC/$file" ]; then
-        echo "$file"
+    # Verify sizes
+    SIZE_MATCH=true
+    if ! diff "$SRC_SIZES" "$DEST_SIZES" > /dev/null; then
+        SIZE_MATCH=false
     fi
-done | xargs -I {} sh -c 'cd "$1" && stat -c "%s %n" "$2" 2>/dev/null || stat -f "%z %N" "$2"' _ "$SRC" {} | sort > "$SRC_SIZES"
 
-# Generate checksums for destination files
-log "Computing destination checksums and sizes..."
-find_matching_files "$DEST" | while IFS= read -r file; do
-    if [ -f "$DEST/$file" ]; then
-        echo "$file"
+    # Report verification results
+    if [ "$CHECKSUM_MATCH" = true ] && [ "$SIZE_MATCH" = true ]; then
+        log "✓ Checksums and file sizes match. Transfer verified successfully."
+        log "Files are safe to delete from SD card."
+        VERIFICATION_PASSED=true
+    elif [ "$CHECKSUM_MATCH" = false ] && [ "$SIZE_MATCH" = false ]; then
+        log "✗ ERROR: Both checksum and size mismatches detected!"
+        log "Source checksum file: $SRC_CHECKSUM"
+        log "Destination checksum file: $DEST_CHECKSUM"
+        log "Differences:"
+        diff "$SRC_CHECKSUM" "$DEST_CHECKSUM" | log
+        log "Source size file: $SRC_SIZES"
+        log "Destination size file: $DEST_SIZES"
+        log "Transfer verification failed. SD card files will NOT be deleted."
+        VERIFICATION_PASSED=false
+    elif [ "$CHECKSUM_MATCH" = false ]; then
+        log "✗ ERROR: Checksum mismatch detected!"
+        log "Source checksum file: $SRC_CHECKSUM"
+        log "Destination checksum file: $DEST_CHECKSUM"
+        log "Transfer verification failed. SD card files will NOT be deleted."
+        VERIFICATION_PASSED=false
+    else
+        log "✗ ERROR: File size mismatch detected!"
+        log "Source size file: $SRC_SIZES"
+        log "Destination size file: $DEST_SIZES"
+        log "Transfer verification failed. SD card files will NOT be deleted."
+        VERIFICATION_PASSED=false
     fi
-done | xargs -I {} sh -c 'cd "$1" && sha256sum "$2"' _ "$DEST" {} | sort > "$DEST_CHECKSUM"
-
-# Generate sizes for destination files
-find_matching_files "$DEST" | while IFS= read -r file; do
-    if [ -f "$DEST/$file" ]; then
-        echo "$file"
-    fi
-done | xargs -I {} sh -c 'cd "$1" && stat -c "%s %n" "$2" 2>/dev/null || stat -f "%z %N" "$2"' _ "$DEST" {} | sort > "$DEST_SIZES"
-
-# Verify checksums
-CHECKSUM_MATCH=true
-if ! diff "$SRC_CHECKSUM" "$DEST_CHECKSUM" > /dev/null; then
-    CHECKSUM_MATCH=false
-fi
-
-# Verify sizes
-SIZE_MATCH=true
-if ! diff "$SRC_SIZES" "$DEST_SIZES" > /dev/null; then
-    SIZE_MATCH=false
-fi
-
-# Report verification results
-if [ "$CHECKSUM_MATCH" = true ] && [ "$SIZE_MATCH" = true ]; then
-    log "✓ Checksums and file sizes match. Transfer verified successfully."
-    log "Files are safe to delete from SD card."
-    VERIFICATION_PASSED=true
-elif [ "$CHECKSUM_MATCH" = false ] && [ "$SIZE_MATCH" = false ]; then
-    log "✗ ERROR: Both checksum and size mismatches detected!"
-    log "Source checksum file: $SRC_CHECKSUM"
-    log "Destination checksum file: $DEST_CHECKSUM"
-    log "Differences:"
-    diff "$SRC_CHECKSUM" "$DEST_CHECKSUM" | log
-    log "Source size file: $SRC_SIZES"
-    log "Destination size file: $DEST_SIZES"
-    log "Transfer verification failed. SD card files will NOT be deleted."
-    VERIFICATION_PASSED=false
-elif [ "$CHECKSUM_MATCH" = false ]; then
-    log "✗ ERROR: Checksum mismatch detected!"
-    log "Source checksum file: $SRC_CHECKSUM"
-    log "Destination checksum file: $DEST_CHECKSUM"
-    log "Transfer verification failed. SD card files will NOT be deleted."
-    VERIFICATION_PASSED=false
-else
-    log "✗ ERROR: File size mismatch detected!"
-    log "Source size file: $SRC_SIZES"
-    log "Destination size file: $DEST_SIZES"
-    log "Transfer verification failed. SD card files will NOT be deleted."
-    VERIFICATION_PASSED=false
-fi
 
     # Clean up temporary verification files
     rm -f "$SRC_CHECKSUM" "$DEST_CHECKSUM" "$SRC_SIZES" "$DEST_SIZES"
