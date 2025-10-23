@@ -10,7 +10,7 @@ Group=root
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStartPre=/bin/sleep 3
 ExecStart=/opt/pi-sd-offloader/sd-card-handler.sh %i
-TimeoutStartSec=600
+TimeoutStartSec=0
 StandardOutput=journal
 StandardError=journal
 

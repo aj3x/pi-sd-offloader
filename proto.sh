@@ -190,6 +190,7 @@ if [ "$SYNC_METHOD" = "rclone" ]; then
         RCLONE_FILTERS+=(--filter="+ *.$ext")
     done
     RCLONE_FILTERS+=(
+        --filter="- ._*"
         --filter="- .*"
         --filter="- *"
     )
@@ -197,7 +198,7 @@ if [ "$SYNC_METHOD" = "rclone" ]; then
     # Convert RCLONE_FLAGS string to array
     read -ra RCLONE_FLAGS_ARRAY <<< "$RCLONE_FLAGS"
     
-    if $RCLONE_CMD copy --metadata --progress "${RCLONE_FLAGS_ARRAY[@]}" "${RCLONE_FILTERS[@]}" "$SRC/" "$RCLONE_DEST/"; then
+    if $RCLONE_CMD copy --log-file=/tmp/rclone-debug.log --log-level=DEBUG --metadata --checkers=2 --timeout=0 --retries=20 --progress "${RCLONE_FLAGS_ARRAY[@]}" "${RCLONE_FILTERS[@]}" "$SRC/" "$RCLONE_DEST/"; then
         log "File copy completed successfully using rclone"
     else
         log "ERROR: rclone copy failed"
