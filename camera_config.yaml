@@ -104,8 +104,6 @@ cameras:
     name: "Ricoh GR IV"
     detection_rules:
       folder_structure:
-        - path: "DCIM"
-          required: true
         - path: "DCIM/100RICOH"
           required: false
       file_patterns:
