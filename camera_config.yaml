@@ -100,6 +100,34 @@ cameras:
     
     destination_structure: "DJI Osmo Pocket 3/{date}/DCIM"
 
+  ricoh_gr_iv:
+    name: "Ricoh GR IV"
+    detection_rules:
+      folder_structure:
+        - path: "DCIM/100RICOH"
+          required: false
+      file_patterns:
+        - pattern: "R*.DNG"
+          confidence: 80
+        - pattern: "R*.MOV"
+          confidence: 80
+      exif_rules:
+        make: "RICOH IMAGING COMPANY, LTD."
+        model_contains: ["RICOH GR IV"]
+        confidence: 95
+
+    file_sources:
+      photos:
+        - path: "DCIM/100RICOH"
+          extensions: [".DNG"]
+          recursive: true
+      videos:
+        - path: "DCIM/100RICOH"
+          extensions: [".MOV"]
+          recursive: true
+
+    destination_structure: "Ricoh GR IV/{date}/DCIM"
+
   # Template for adding new cameras
   insta360_go3:
     name: "Insta360 Go3"

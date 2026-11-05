@@ -107,11 +107,22 @@ cameras:
 ## Supported Cameras
 
 ### Currently Configured
+- **Ricoh GR IV**: DNG photos and MOV videos under DCIM (default folder: 100RICOH)
 - **Sony A7C**: ARW/JPG photos in DCIM, MP4 videos in PRIVATE/M4ROOT/CLIP
 - **DJI Osmo Pocket 3**: JPG/MOV files in DCIM/100_FUJI
 - **Fujifilm XP150**: LRF/MP4/WAV files in DCIM/DJI_001
 
 ### Adding New Cameras
+The Ricoh GR IV configuration uses the owner-confirmed default filenames
+`R0000218.DNG` and `R0000772.MOV`, EXIF Make `RICOH IMAGING COMPANY, LTD.`,
+and Model `RICOH GR IV`. Sources are scanned recursively under `DCIM` so
+additional numbered folders are included. Folder and filename hints are not
+model-specific; EXIF provides the stronger identification.
+
+`camera_config.yaml` describes camera rules, but the current `proto.sh`
+prototype uses hard-coded camera detection and does not read this YAML.
+Adding a configuration entry alone does not enable prototype offloading.
+
 1. Edit `camera_config.yaml` with detection rules
 2. Restart service: `sudo systemctl restart pi-sd-offloader`
 3. Test with actual SD card from the camera
