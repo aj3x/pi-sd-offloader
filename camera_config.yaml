@@ -118,7 +118,7 @@ cameras:
 
     file_sources:
       photos:
-        - path: "DCIM"
+        - path: "DCIM/100RICOH"
           extensions: [".DNG"]
           recursive: true
       videos:
